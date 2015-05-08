@@ -61,21 +61,32 @@ void Accel_Init()
   // Then shift in our new ODR bits:
   uint8_t aRate = 0x5;
   temp |= (aRate << 4);
-  //St G
+  //Set the acell ODR
   Wire.beginTransmission(ACCEL_ADDRESS);
   WIRE_SEND(0x20);
   WIRE_SEND(temp);
   Wire.endTransmission();
   delay(5);
   
-  
-  
-  // Because our main loop runs at 50Hz we adjust the output data rate to 50Hz (25Hz bandwidth)
   Wire.beginTransmission(ACCEL_ADDRESS);
-  WIRE_SEND(0x2C);  // Rate
-  WIRE_SEND(0x09);  // Set to 50Hz, normal operation
+  WIRE_SEND(0x21);
+  Wire.endTransmission(false);
+  Wire.requestFrom(ACCEL_ADDRESS, 1); 
+  temp = Wire.read();  
+  // Then mask out the accel scale bits:
+  temp &= 0xFF^(0x3 << 3);
+  // Then shift in our new scale bits:
+  uint8_t aScl = 0x0;
+  temp |= aScl << 3;
+  // And write the new register value back into CTRL_REG2_XM:
+  //Set the acell scale
+  Wire.beginTransmission(ACCEL_ADDRESS);
+  WIRE_SEND(0x21);
+  WIRE_SEND(temp);
   Wire.endTransmission();
   delay(5);
+  
+
   
 }
 
@@ -115,17 +126,81 @@ void Read_Accel()
 
 void Magn_Init()
 {
+  //CTRL_REG5_XM enables temp sensor,
   Wire.beginTransmission(MAGN_ADDRESS);
-  WIRE_SEND(0x02); 
-  WIRE_SEND(0x00);  // Set continuous mode (default 10Hz)
+  WIRE_SEND(0x24); 
+  WIRE_SEND(0x94);  
   Wire.endTransmission();
   delay(5);
-
+  
+  //CTRL_REG6_XM sets the magnetometer full-scale
   Wire.beginTransmission(MAGN_ADDRESS);
-  WIRE_SEND(0x00);
-  WIRE_SEND(0b00011000);  // Set 50Hz
+  WIRE_SEND(0x25);
+  WIRE_SEND(0x00);  
   Wire.endTransmission();
   delay(5);
+  
+  //CTRL_REG7_XM sets magnetic sensor mode, low power mode, and filters  
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x26);
+  WIRE_SEND(0x00); 
+  Wire.endTransmission();
+  delay(5);
+ 
+  //CTRL_REG4_XM is used to set interrupt generators on INT2_XM
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x23);
+  WIRE_SEND(0x04);
+  Wire.endTransmission();
+  delay(5);
+  
+  //INT_CTRL_REG_M to set push-pull/open drain, and active-low/high
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x12);
+  WIRE_SEND(0x09);  
+  Wire.endTransmission();
+  delay(5);
+  
+  //Mad ODR
+  uint8_t temp;
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x24);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MAGN_ADDRESS, 1); 
+  temp = Wire.read();  
+  // Then mask out the mag ODR bits:
+  temp &= 0xFF^(0x7 << 2);
+  // Then shift in our new ODR bits:
+  uint8_t mRate = 0x04;
+  temp |= (mRate << 2);
+  // And write the new register value back into CTRL_REG5_XM:
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x24);
+  WIRE_SEND(temp);  
+  Wire.endTransmission();
+  delay(5);
+  
+  
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x25);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MAGN_ADDRESS, 1); 
+  temp = Wire.read();  
+  // Then mask out the mag scale bits:
+  temp &= 0xFF^(0x3 << 5);
+  // Then shift in our new scale bits:
+  uint8_t mScl = 0x00;
+  temp |= mScl << 5;
+  // And write the new register value back into CTRL_REG6_XM:
+  Wire.beginTransmission(MAGN_ADDRESS);
+  WIRE_SEND(0x25);
+  WIRE_SEND(temp);  
+  Wire.endTransmission();
+  delay(5);
+  
+  
+  
+  
 }
 
 void Read_Magn()
@@ -183,31 +258,37 @@ void Read_Magn()
 
 void Gyro_Init()
 {
-  // Power up reset defaults
+  // CTRL_REG1_G sets output data rate, bandwidth, power-down and enables
   Wire.beginTransmission(GYRO_ADDRESS);
-  WIRE_SEND(0x3E);
-  WIRE_SEND(0x80);
+  WIRE_SEND(0x20);
+  WIRE_SEND(0x0F);
   Wire.endTransmission();
   delay(5);
   
-  // Select full-scale range of the gyro sensors
-  // Set LP filter bandwidth to 42Hz
+  // CTRL_REG2_G sets up the HPF
   Wire.beginTransmission(GYRO_ADDRESS);
-  WIRE_SEND(0x16);
-  WIRE_SEND(0x1B);  // DLPF_CFG = 3, FS_SEL = 3
+  WIRE_SEND(0x21);
+  WIRE_SEND(0x00);  // DLPF_CFG = 3, FS_SEL = 3
   Wire.endTransmission();
   delay(5);
   
-  // Set sample rato to 50Hz
+  //  CTRL_REG3_G sets up interrupt and DRDY_G pins
   Wire.beginTransmission(GYRO_ADDRESS);
-  WIRE_SEND(0x15);
-  WIRE_SEND(0x0A);  //  SMPLRT_DIV = 10 (50Hz)
+  WIRE_SEND(0x22);
+  WIRE_SEND(0x88);  //  SMPLRT_DIV = 10 (50Hz)
   Wire.endTransmission();
   delay(5);
 
-  // Set clock to PLL with z gyro reference
+  // CTRL_REG4_G sets the scale, update mode
   Wire.beginTransmission(GYRO_ADDRESS);
-  WIRE_SEND(0x3E);
+  WIRE_SEND(0x23);
+  WIRE_SEND(0x00);
+  Wire.endTransmission();
+  delay(5);  
+  
+  // CTRL_REG5_G sets up the FIFO, HPF, and INT1
+  Wire.beginTransmission(GYRO_ADDRESS);
+  WIRE_SEND(0x23);
   WIRE_SEND(0x00);
   Wire.endTransmission();
   delay(5);

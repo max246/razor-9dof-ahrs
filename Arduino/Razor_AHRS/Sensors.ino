@@ -1,11 +1,11 @@
 /* This file is part of the Razor AHRS Firmware */
 
 // I2C code to read the sensors
-
+//
 // Sensor I2C addresses
-#define ACCEL_ADDRESS ((int) 0x53) // 0x53 = 0xA6 / 2
+#define ACCEL_ADDRESS ((int) 0x1D) // 0x53 = 0xA6 / 2
 #define MAGN_ADDRESS  ((int) 0x1E) // 0x1E = 0x3C / 2
-#define GYRO_ADDRESS  ((int) 0x68) // 0x68 = 0xD0 / 2
+#define GYRO_ADDRESS  ((int) 0x6B) // 0x68 = 0xD0 / 2
 
 // Arduino backward compatibility macros
 #if ARDUINO >= 100
@@ -24,16 +24,51 @@ void I2C_Init()
 
 void Accel_Init()
 {
+  
+  //CTRL_REG0_XM 
   Wire.beginTransmission(ACCEL_ADDRESS);
-  WIRE_SEND(0x2D);  // Power register
-  WIRE_SEND(0x08);  // Measurement mode
+  WIRE_SEND(0x1F); 
+  WIRE_SEND(0x00); 
   Wire.endTransmission();
   delay(5);
+  //CTRL_REG1_XM
   Wire.beginTransmission(ACCEL_ADDRESS);
-  WIRE_SEND(0x31);  // Data format register
-  WIRE_SEND(0x08);  // Set to full resolution
+  WIRE_SEND(0x20);
+  WIRE_SEND(0x57);
   Wire.endTransmission();
   delay(5);
+  //CTRL_REG2_XM
+  Wire.beginTransmission(ACCEL_ADDRESS);
+  WIRE_SEND(0x21);
+  WIRE_SEND(0x00);
+  Wire.endTransmission();
+  delay(5);
+  //CTRL_REG3_XM 
+  Wire.beginTransmission(ACCEL_ADDRESS);
+  WIRE_SEND(0x22);
+  WIRE_SEND(0x04);
+  Wire.endTransmission();
+  delay(5);
+  
+  uint8_t temp;
+  Wire.beginTransmission(ACCEL_ADDRESS);
+  WIRE_SEND(0x20);
+  Wire.endTransmission(false);
+  Wire.requestFrom(ACCEL_ADDRESS, 1); 
+  temp = Wire.read();  
+  // Then mask out the gyro ODR bits:
+  temp &= 0xFF^(0xF << 4);
+  // Then shift in our new ODR bits:
+  uint8_t aRate = 0x5;
+  temp |= (aRate << 4);
+  //St G
+  Wire.beginTransmission(ACCEL_ADDRESS);
+  WIRE_SEND(0x20);
+  WIRE_SEND(temp);
+  Wire.endTransmission();
+  delay(5);
+  
+  
   
   // Because our main loop runs at 50Hz we adjust the output data rate to 50Hz (25Hz bandwidth)
   Wire.beginTransmission(ACCEL_ADDRESS);
@@ -41,6 +76,7 @@ void Accel_Init()
   WIRE_SEND(0x09);  // Set to 50Hz, normal operation
   Wire.endTransmission();
   delay(5);
+  
 }
 
 // Reads x, y and z accelerometer registers
